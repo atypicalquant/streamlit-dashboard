@@ -36,7 +36,8 @@ def get_counties_data():
 
 def load_counties_visit_data(conn):
     df_counties = conn.read(
-        spreadsheet=st.secrets.connections.gsheets.sheet_visits, worksheet="Counties"
+        spreadsheet=st.secrets.connections.gsheets.sheet_visits, worksheet="Counties",
+        ttl=0
     )[['County', 'Capital', 'Code', 'Been to']]
 
     df_counties['County'] = (
