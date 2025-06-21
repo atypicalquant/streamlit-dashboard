@@ -5,67 +5,92 @@ from pathlib import Path
 import numpy as np
 import geopandas as gpd
 
+import folium
+from streamlit_folium import st_folium
 from streamlit_gsheets import GSheetsConnection
 
-# Create a connection object.
+import geopandas as gpd
 conn = st.connection("gsheets", type=GSheetsConnection)
-dff = conn.read(spreadsheet=st.secrets.GOOGLE_SHEET_COUNTIES, worksheet="Counties")
+
 
 # Set the title and favicon that appear in the Browser's tab bar.
 st.set_page_config(
-    page_title='ATQ dashboard',
+    page_title='ATQ Travel',
     page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
 )
 
 # -----------------------------------------------------------------------------
 # Declare some useful functions.
 
+# Cached data loading
 @st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
-
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
-
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
-
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
-
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
+def get_counties_data():
+    url = "https://raw.githubusercontent.com/GabrielRondelli/geojson/main/romania-counties.geojson"
+    gdf = gpd.read_file(url)
+    gdf['County'] = (
+        gdf['NAME_1'].str.normalize('NFKD')
+        .str.encode('ascii', errors='ignore')
+        .str.decode('utf-8')
     )
+    return gdf
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+def load_counties_visit_data(conn):
+    df_counties = conn.read(
+        spreadsheet=st.secrets.connections.gsheets.sheet_visits, worksheet="Counties"
+    )[['County', 'Capital', 'Code', 'Been to']]
 
-    return gdp_df
+    df_counties['County'] = (
+        df_counties['County'].str.normalize('NFKD')
+        .str.encode('ascii', errors='ignore')
+        .str.decode('utf-8')
+    )
+    df_counties["status"] = df_counties['Been to'].astype(int)
+    return df_counties
 
-gdp_df = get_gdp_data()
+def style_polygon(color):
+    return lambda _: {
+        'fillColor': color,
+        'color': 'black',
+        'weight': 1,
+        'fillOpacity': 0.5,
+    }
+
+def add_polygon_and_label(map_obj, geometry, county_name, color):
+    folium.GeoJson(
+        geometry,
+        style_function=style_polygon(color),
+        tooltip=county_name
+    ).add_to(map_obj)
+
+    centroid = geometry.centroid
+    folium.Marker(
+        location=[centroid.y, centroid.x],
+        icon=folium.DivIcon(
+            html=f'<div style="font-size:8pt;color:black;text-align:center;">{county_name}</div>'
+        ),
+    ).add_to(map_obj)
+
+# Main execution
+gdf = get_counties_data()
+df_counties = load_counties_visit_data(conn)
+
+merged = gdf.merge(df_counties, on="County", how="left")
+merged["status"] = merged["status"].fillna(0).astype(int)
+
+# Metrics for display
+total_counties = len(merged)
+visited_counties = merged['status'].sum()
+percentage_visited = (visited_counties / total_counties) * 100
+
+color_map = {0: "transparent", 1: "green"}
+
+m = folium.Map(
+    location=[45.9432, 24.9668], zoom_start=6, tiles="cartodbpositron"
+)
+
+for _, row in merged.iterrows():
+    add_polygon_and_label(m, row['geometry'], row['County'], color_map[row['status']])
+
 
 
 # -----------------------------------------------------------------------------
@@ -73,102 +98,19 @@ gdp_df = get_gdp_data()
 
 # Set the title that appears at the top of the page.
 '''
-# :earth_americas: GDP dashboard 
-
-Browse xxx GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
+# :romania: Romania Travels
 '''
 
-df = pd.DataFrame(
-    {
-        "col1": np.random.randn(1000) / 50 + 37.74,
-        "col2": np.random.randn(1000) / 50 + -122.4,
-        "col3": np.random.randn(1000) * 100,
-        "col4": np.random.rand(1000, 4).tolist(),
-    }
-)
 
-print(df)
+# Render map in Streamlit
+st_folium(m, width=700, height=500)
 
-st.map(df, latitude="col1", longitude="col2", size="col3", color="col4")
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Counties", total_counties)
+col2.metric("Visited Counties", visited_counties)
+col3.metric("Percentage Visited", f"{percentage_visited:.1f}%")
 
 
-from_year, to_year = st.slider(
-    f'Which years are you interested inx {dff.columns}? {st.secrets.GOOGLE_SHEET_COUNTIES}',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+'''
+# :earth_americas: International Travels
+'''
