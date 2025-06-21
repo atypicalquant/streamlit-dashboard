@@ -1,2 +1,5 @@
 streamlit
 pandas
+geopandas
+gspread
+oauth2client

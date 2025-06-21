@@ -3,6 +3,8 @@ import pandas as pd
 import math
 from pathlib import Path
 import numpy as np
+import geopandas as gpd
+
 
 # Set the title and favicon that appear in the Browser's tab bar.
 st.set_page_config(
@@ -74,12 +76,14 @@ But it's otherwise a great (and did I mention _free_?) source of data.
 
 df = pd.DataFrame(
     {
-        "col1": np.random.randn(1000) / 50 + 37.76,
+        "col1": np.random.randn(1000) / 50 + 37.74,
         "col2": np.random.randn(1000) / 50 + -122.4,
         "col3": np.random.randn(1000) * 100,
         "col4": np.random.rand(1000, 4).tolist(),
     }
 )
+
+print(df)
 
 st.map(df, latitude="col1", longitude="col2", size="col3", color="col4")
 
