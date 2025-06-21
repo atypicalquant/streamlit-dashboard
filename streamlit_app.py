@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import math
 from pathlib import Path
+import numpy as np
 
 # Set the title and favicon that appear in the Browser's tab bar.
 st.set_page_config(
@@ -64,12 +65,23 @@ gdp_df = get_gdp_data()
 
 # Set the title that appears at the top of the page.
 '''
-# :earth_americas: GDP dashboard
+# :earth_americas: GDP dashboard 
 
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
+Browse xxx GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
 notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
 But it's otherwise a great (and did I mention _free_?) source of data.
 '''
+
+df = pd.DataFrame(
+    {
+        "col1": np.random.randn(1000) / 50 + 37.76,
+        "col2": np.random.randn(1000) / 50 + -122.4,
+        "col3": np.random.randn(1000) * 100,
+        "col4": np.random.rand(1000, 4).tolist(),
+    }
+)
+
+st.map(df, latitude="col1", longitude="col2", size="col3", color="col4")
 
 # Add some spacing
 ''
@@ -78,8 +90,9 @@ But it's otherwise a great (and did I mention _free_?) source of data.
 min_value = gdp_df['Year'].min()
 max_value = gdp_df['Year'].max()
 
+
 from_year, to_year = st.slider(
-    'Which years are you interested in?',
+    f'Which years are you interested inx? {st.secrets.DB_USERNAME}',
     min_value=min_value,
     max_value=max_value,
     value=[min_value, max_value])
