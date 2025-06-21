@@ -4,14 +4,12 @@ import math
 from pathlib import Path
 import numpy as np
 import geopandas as gpd
-from oauth2client.service_account import ServiceAccountCredentials
 
 from streamlit_gsheets import GSheetsConnection
 
 # Create a connection object.
 conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read(spreadsheet=st.secrets.GOOGLE_SHEET_COUNTIES, worksheet="Counties")
-
 
 
 # Set the title and favicon that appear in the Browser's tab bar.
