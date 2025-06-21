@@ -1,5 +1,4 @@
 streamlit
 pandas
 geopandas
-gspread
-oauth2client
+st-gsheets-connection
