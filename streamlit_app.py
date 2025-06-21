@@ -9,8 +9,7 @@ from streamlit_gsheets import GSheetsConnection
 
 # Create a connection object.
 conn = st.connection("gsheets", type=GSheetsConnection)
-df = conn.read(spreadsheet=st.secrets.GOOGLE_SHEET_COUNTIES, worksheet="Counties")
-
+dff = conn.read(spreadsheet=st.secrets.GOOGLE_SHEET_COUNTIES, worksheet="Counties")
 
 # Set the title and favicon that appear in the Browser's tab bar.
 st.set_page_config(
@@ -103,7 +102,7 @@ max_value = gdp_df['Year'].max()
 
 
 from_year, to_year = st.slider(
-    f'Which years are you interested inx {google_sa_json_str}? {st.secrets.GOOGLE_SHEET_COUNTIES}',
+    f'Which years are you interested inx {dff.columns}? {st.secrets.GOOGLE_SHEET_COUNTIES}',
     min_value=min_value,
     max_value=max_value,
     value=[min_value, max_value])
